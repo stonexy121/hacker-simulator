@@ -125,93 +125,113 @@ void DrawGame() {
     if (sc.loc == "city" || sc.loc == "tower") DrawCity();
     DrawRectangle(0, 0, W, H, {0, 0, 0, 160});
     
+    // Отступы для мобильной версии
+    int pad = Sc(20);
+    int headerH = Sc(55);
+    
     // Заголовок локации
     const char* locNames[] = {"???", u8"УБЕЖИЩЕ", u8"НЕО-МОСКВА", u8"ПРОМЗОНА", u8"ТРУЩОБЫ", u8"ПОДЗЕМКА", u8"БАШНЯ NEXUS", u8"ФИНАЛ"};
     const char* locs[] = {"dark", "safe", "city", "ind", "slum", "under", "tower", "end"};
     const char* locName = "???";
     for (int i = 0; i < 8; i++) if (sc.loc == locs[i]) locName = locNames[i];
     
-    DrawPanel(20, 12, 220, 45, C_CYAN);
-    DrawNeonText(locName, 35, 20, 22, C_CYAN);
+    DrawPanel(pad, pad, Sc(250), headerH, C_CYAN);
+    DrawNeonText(locName, pad + Sc(15), pad + Sc(12), Sc(26), C_CYAN);
     
-    // Статы
-    DrawPanel(W - 320, 12, 300, 45, C_MAG);
+    // Статы - справа вверху
+    int statsW = Sc(280);
+    DrawPanel(W - statsW - pad, pad, statsW, headerH, C_MAG);
     char stats[96];
-    snprintf(stats, 96, u8"КРЕДИТЫ: %d   КАРМА: %d", gCredits, gKarma);
-    DrawText2(stats, W - 305, 22, 16, C_WHITE);
-    Color karmaCol = gKarma > 20 ? C_GREEN : gKarma < -20 ? C_RED : C_YELLOW;
-    DrawRectangle(W - 80, 40, 60, 8, {40, 40, 40, 255});
-    DrawRectangle(W - 80, 40, (int)(30 + gKarma * 0.3f), 8, karmaCol);
+    snprintf(stats, 96, u8"💰 %d  ⚖ %d", gCredits, gKarma);
+    DrawText2(stats, W - statsW - pad + Sc(15), pad + Sc(15), Sc(22), C_WHITE);
     
-    // Диалоговое окно
-    DrawPanel(40, 70, W - 80, H - 180, C_CYAN);
+    // Диалоговое окно - основная область
+    int dialogY = pad + headerH + Sc(15);
+    int dialogH = H - dialogY - Sc(20);
+    DrawPanel(pad, dialogY, W - pad*2, dialogH, C_CYAN);
+    
+    int contentPad = Sc(25);
+    int textX = pad + contentPad;
+    int textMaxW = W - pad*2 - contentPad*2;
     
     if (gLine < (int)sc.dlg.size()) {
         DLine& dl = sc.dlg[gLine];
         if (gDispText.empty()) { gDispText = dl.text; gTypeIdx = 0; }
         
-        int ty = 95;
+        int ty = dialogY + contentPad;
+        int nameSize = Sc(28);
+        int textSize = Sc(24);
+        int lineH = Sc(32);
+        
         if (!dl.who.empty()) {
             Color nc = dl.who == "SYS" ? C_GREEN : dl.who == "GHOST" ? C_CYAN :
                        dl.who == "NEON" ? C_MAG : dl.who == "VIPER" ? C_RED :
                        dl.who == "MAYA" ? Color{255,150,0,255} : dl.who == "ORACLE" ? Color{150,0,255,255} :
                        dl.who == u8"ЛИ" ? C_YELLOW : dl.who == u8"СОЗДАТЕЛЬ" ? C_WHITE :
                        dl.player ? C_YELLOW : C_WHITE;
-            DrawNeonText(dl.who.c_str(), 60, ty, 24, nc);
-            ty += 40;
+            DrawNeonText(dl.who.c_str(), textX, ty, nameSize, nc);
+            ty += Sc(45);
         }
         
-        // Текст с переносом
+        // Текст с переносом - КРУПНЫЙ
         std::string vis = gDispText.substr(0, gTypeIdx);
-        int lineH = 28, maxW = W - 160;
         std::string line;
         int ly = ty;
         for (char c : vis) {
             line += c;
-            if (MeasureText2(line.c_str(), 20) > maxW || c == '\n') {
+            if (MeasureText2(line.c_str(), textSize) > textMaxW || c == '\n') {
                 if (c != '\n') { size_t sp = line.rfind(' '); if (sp != std::string::npos) line = line.substr(0, sp); }
-                DrawText2(line.c_str(), 60, ly, 20, C_WHITE);
+                DrawText2(line.c_str(), textX, ly, textSize, C_WHITE);
                 ly += lineH;
                 line.clear();
             }
         }
-        if (!line.empty()) DrawText2(line.c_str(), 60, ly, 20, C_WHITE);
+        if (!line.empty()) DrawText2(line.c_str(), textX, ly, textSize, C_WHITE);
         
         // Курсор
         if (gTypeIdx < (int)gDispText.size() && (int)(gTime * 3) % 2) {
-            DrawRectangle(60 + MeasureText2(line.c_str(), 20), ly, 12, 22, C_CYAN);
+            DrawRectangle(textX + MeasureText2(line.c_str(), textSize), ly, Sc(14), Sc(26), C_CYAN);
         }
         
+        // Подсказка продолжения
         if (gTypeIdx >= (int)gDispText.size()) {
             float b = 0.5f + 0.5f * sinf(gTime * 4);
-            DrawText2(u8"[ ENTER ]", W - 140, H - 130, 16, {200, 200, 200, (unsigned char)(b*255)});
+            const char* hint = u8"[ КОСНИТЕСЬ ]";
+            int hintW = MeasureText2(hint, Sc(20));
+            DrawText2(hint, W - pad - contentPad - hintW, dialogY + dialogH - Sc(40), Sc(20), {200, 200, 200, (unsigned char)(b*255)});
         }
     } else {
-        // Выборы
-        DrawNeonText(u8"ВЫБОР:", 60, 95, 22, C_YELLOW);
+        // Выборы - БОЛЬШИЕ КНОПКИ
+        int choiceBtnH = Sc(65);
+        int choiceBtnPad = Sc(12);
+        int choiceStartY = dialogY + contentPad;
+        int choiceBtnW = W - pad*2 - contentPad*2;
+        
+        DrawNeonText(u8"ВЫБОР:", textX, choiceStartY, Sc(24), C_YELLOW);
+        choiceStartY += Sc(45);
+        
         for (int i = 0; i < (int)sc.ch.size(); i++) {
-            int y = 145 + i * 55;
+            int y = choiceStartY + i * (choiceBtnH + choiceBtnPad);
             bool s = i == gMenuSel;
-            if (s) {
-                DrawRectangle(55, y - 8, W - 120, 48, {0, 255, 255, 25});
-                DrawRectangleLinesEx({55, (float)(y - 8), (float)(W - 120), 48}, 2, C_CYAN);
+            
+            // Фон кнопки
+            Color bg = s ? Color{0, 60, 80, 220} : Color{20, 30, 50, 180};
+            DrawRectangleRounded({(float)textX, (float)y, (float)choiceBtnW, (float)choiceBtnH}, 0.1f, 8, bg);
+            DrawRectangleRoundedLinesEx({(float)textX, (float)y, (float)choiceBtnW, (float)choiceBtnH}, 0.1f, 8, 2, s ? C_CYAN : C_GRAY);
+            
+            // Номер и текст
+            char num[8]; snprintf(num, 8, "%d.", i + 1);
+            DrawText2(num, textX + Sc(15), y + Sc(18), Sc(24), s ? C_CYAN : C_GRAY);
+            DrawText2(sc.ch[i].text.c_str(), textX + Sc(55), y + Sc(18), Sc(22), s ? C_WHITE : C_GRAY);
+            
+            // Индикатор кармы
+            if (sc.ch[i].karma > 0) {
+                DrawText2(u8"+", W - pad - Sc(60), y + Sc(18), Sc(24), C_GREEN);
             }
-            char num[8]; snprintf(num, 8, "[%d]", i + 1);
-            DrawText2(num, 65, y + 5, 20, s ? C_CYAN : C_GRAY);
-            DrawText2(sc.ch[i].text.c_str(), 120, y + 5, 20, s ? C_WHITE : C_GRAY);
-            if (sc.ch[i].karma > 0) DrawText2(u8"+Карма", W - 150, y + 5, 14, C_GREEN);
-            if (sc.ch[i].karma < 0) DrawText2(u8"-Карма", W - 150, y + 5, 14, C_RED);
+            if (sc.ch[i].karma < 0) {
+                DrawText2(u8"-", W - pad - Sc(60), y + Sc(18), Sc(24), C_RED);
+            }
         }
-    }
-    
-    // Лог
-    DrawPanel(40, H - 100, W - 80, 85, C_CYAN);
-    DrawText2(u8"ЛОГ:", 55, H - 92, 12, C_CYAN);
-    int ly = H - 75;
-    for (auto& l : gLog) {
-        DrawText2(l.first.c_str(), 55, ly, 13, l.second);
-        ly += 16;
-        if (ly > H - 20) break;
     }
 }
 
@@ -334,12 +354,16 @@ void UpdateGame(float dt) {
             int n = (int)sc.ch.size();
             if (n == 0) return;
             
-            // Размеры кнопок выбора
-            int choiceBtnH = Sc(55);
-            int choiceBtnPad = Sc(10);
-            int choiceStartY = Sc(150);
-            int choiceBtnW = W - Sc(100);
-            int choiceX = Sc(50);
+            // Размеры кнопок выбора (должны совпадать с DrawGame)
+            int pad = Sc(20);
+            int headerH = Sc(55);
+            int dialogY = pad + headerH + Sc(15);
+            int contentPad = Sc(25);
+            int choiceBtnH = Sc(65);
+            int choiceBtnPad = Sc(12);
+            int choiceStartY = dialogY + contentPad + Sc(45); // После заголовка "ВЫБОР:"
+            int choiceBtnW = W - pad*2 - contentPad*2;
+            int choiceX = pad + contentPad;
             
             // Сенсорный выбор вариантов - тап по кнопке
             bool choiceConfirm = false;
