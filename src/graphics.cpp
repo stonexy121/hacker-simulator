@@ -44,7 +44,7 @@ void UpdateVisuals(float dt) {
         p.v.y += 150 * dt;
     }
     gParts.erase(std::remove_if(gParts.begin(), gParts.end(),
-        [](auto& p) { return p.life <= 0; }), gParts.end());
+        [](const Particle& p) { return p.life <= 0; }), gParts.end());
 }
 
 void SpawnParticles(Vector2 pos, Color c, int n) {
@@ -65,7 +65,7 @@ void DrawBackground() {
         for (int j = 0; j < 12; j++) {
             float cy = y - j * 18;
             if (cy > 0 && cy < H) {
-                char s[2] = {'0' + rand() % 10, 0};
+                char s[2] = {(char)('0' + rand() % 10), 0};
                 DrawText(s, i * 12, (int)cy, 12, 
                     {0, (unsigned char)(180 + rand() % 75), 0, (unsigned char)(255 - j * 20)});
             }

@@ -45,10 +45,12 @@ jobs:
         sed -i 's/InitWindow(W, H,/InitWindow(0, 0,/' android-build/app/src/main/cpp/main.cpp
         sed -i 's|resources/JetBrainsMono.ttf|JetBrainsMono.ttf|' android-build/app/src/main/cpp/main.cpp
     
-    - name: Fix CMake path
+    - name: Fix CMake path and C++ standard
       run: |
         cmake --version
         echo "cmake.dir=/opt/cmake-3.30.3" >> android-build/local.properties
+        # Set C++17 standard
+        sed -i 's/set(CMAKE_CXX_STANDARD 11)/set(CMAKE_CXX_STANDARD 17)/' android-build/app/src/main/cpp/CMakeLists.txt
     
     - name: Build APK
       working-directory: android-build

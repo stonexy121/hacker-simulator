@@ -303,7 +303,7 @@ void DrawHackGame(const HackGame& h, Font& font) {
             Color c = lit ? C_CYAN : done ? C_GREEN : Color{40, 50, 70, 255};
             DrawRectangle(x, y, 70, 70, c);
             DrawRectangleLinesEx({(float)x, (float)y, 70, 70}, 2, C_CYAN);
-            char n[2] = {'1' + (char)i, 0};
+            char n[2] = {(char)('1' + i), 0};
             Text(n, x + 25, y + 20, 24, lit || done ? C_WHITE : C_GRAY);
         }
         
