@@ -30,9 +30,15 @@ bool TouchInRect(int x, int y, int w, int h) {
            gTouchPos.y >= y && gTouchPos.y <= y + h;
 }
 
+// Позиция начала касания (для определения тапа)
+Vector2 gTouchStartPos = {0, 0};
+
 // Проверка тапа (короткое касание) в области
 bool TappedRect(int x, int y, int w, int h) {
-    return gTouchReleased && gTouchHoldTime < 0.3f && TouchInRect(x, y, w, h);
+    if (!gTouchReleased || gTouchHoldTime > 0.5f) return false;
+    // Проверяем начальную позицию касания
+    return gTouchStartPos.x >= x && gTouchStartPos.x <= x + w &&
+           gTouchStartPos.y >= y && gTouchStartPos.y <= y + h;
 }
 
 void AddLog(const std::string& t, Color c) {
@@ -271,17 +277,24 @@ void UpdateGame(float dt) {
     // Обновление сенсорного ввода
     gTouchMode = true; // Всегда мобильный режим
     
+    // Получаем текущую позицию
+    Vector2 currentPos = GetTouchPointCount() > 0 ? GetTouchPosition(0) : GetMousePosition();
+    
     // Отслеживание касания
-    bool wasTouching = gTouchPressed || IsMouseButtonDown(MOUSE_LEFT_BUTTON);
     gTouchPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     gTouchReleased = IsMouseButtonReleased(MOUSE_LEFT_BUTTON);
-    gTouchPos = GetTouchPointCount() > 0 ? GetTouchPosition(0) : GetMousePosition();
+    
+    // Сохраняем начальную позицию при нажатии
+    if (gTouchPressed) {
+        gTouchStartPos = currentPos;
+        gTouchHoldTime = 0;
+    }
+    
+    gTouchPos = currentPos;
     
     // Время удержания
     if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) || GetTouchPointCount() > 0) {
         gTouchHoldTime += dt;
-    } else {
-        gTouchHoldTime = 0;
     }
     
     // Размеры кнопок меню (должны совпадать с DrawMenu)
