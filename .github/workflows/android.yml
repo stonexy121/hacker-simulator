@@ -41,15 +41,28 @@ jobs:
         sed -i 's/InitWindow(W, H,/InitWindow(0, 0,/' android-build/app/src/main/cpp/main.cpp
         sed -i 's|resources/JetBrainsMono.ttf|JetBrainsMono.ttf|' android-build/app/src/main/cpp/main.cpp
     
-    - name: Set CMake version in gradle
+    - name: Fix CMake version
       run: |
-        sed -i 's/cmake {/cmake {\n            version "3.22.1"/' android-build/app/build.gradle
+        # Add cmake to PATH
+        export PATH=$ANDROID_SDK_ROOT/cmake/3.22.1/bin:$PATH
+        cmake --version
+        
+        # Update local.properties with cmake path
+        echo "cmake.dir=$ANDROID_SDK_ROOT/cmake/3.22.1" >> android-build/local.properties
+        
+        # Patch build.gradle to use specific CMake version
+        sed -i '/externalNativeBuild {/,/}/s/cmake {/cmake {\n                version "3.22.1"/' android-build/app/build.gradle
+        
+        # Also try setting in gradle.properties
+        echo "android.native.buildOutput=verbose" >> android-build/gradle.properties
     
     - name: Build APK
       working-directory: android-build
+      env:
+        PATH: /usr/local/lib/android/sdk/cmake/3.22.1/bin:$PATH
       run: |
         chmod +x gradlew
-        ./gradlew assembleRelease -Dcmake.dir=$ANDROID_SDK_ROOT/cmake/3.22.1
+        ./gradlew assembleRelease --info
     
     - name: Upload APK
       uses: actions/upload-artifact@v4
