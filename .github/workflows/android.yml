@@ -39,14 +39,38 @@ jobs:
         mkdir -p android-build/app/src/main/assets
         cp resources/* android-build/app/src/main/assets/ || true
     
-    - name: Patch main.cpp for Android
+    - name: Patch source files for Android
       run: |
         sed -i '1s/^/#include "raymob.h"\n/' android-build/app/src/main/cpp/main.cpp
         sed -i 's/InitWindow(W, H,/InitWindow(0, 0,/' android-build/app/src/main/cpp/main.cpp
         sed -i 's|resources/JetBrainsMono.ttf|JetBrainsMono.ttf|' android-build/app/src/main/cpp/main.cpp
         
-        # Set landscape orientation in AndroidManifest
-        sed -i 's/android:configChanges="/android:screenOrientation="sensorLandscape" android:configChanges="/' android-build/app/src/main/AndroidManifest.xml
+    - name: Set landscape orientation
+      run: |
+        cat > android-build/app/src/main/AndroidManifest.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <application
+                android:allowBackup="true"
+                android:icon="@mipmap/ic_launcher"
+                android:label="Hacker Simulator"
+                android:roundIcon="@mipmap/ic_launcher_round"
+                android:supportsRtl="true"
+                android:theme="@style/Theme.Raymob">
+                <activity
+                    android:name=".NativeActivity"
+                    android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+                    android:screenOrientation="sensorLandscape"
+                    android:exported="true">
+                    <meta-data android:name="android.app.lib_name" android:value="raymob" />
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
     
     - name: Fix CMake path and C++ standard
       run: |
