@@ -32,7 +32,7 @@ jobs:
     
     - name: Clone Raymob template
       run: |
-        git clone https://github.com/Bigfoot71/Raymob.git android-build
+        git clone --recursive https://github.com/Bigfoot71/Raymob.git android-build
         rm android-build/app/src/main/cpp/main.c
         cp src/main.cpp src/game.cpp src/graphics.cpp src/story.cpp src/hacking.cpp src/systems.cpp android-build/app/src/main/cpp/
         cp src/types.hpp src/hacking.hpp android-build/app/src/main/cpp/
