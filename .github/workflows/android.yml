@@ -56,9 +56,9 @@ jobs:
                 android:label="Hacker Simulator"
                 android:roundIcon="@mipmap/ic_launcher_round"
                 android:supportsRtl="true"
-                android:theme="@style/Theme.Raymob">
+                android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
                 <activity
-                    android:name=".NativeActivity"
+                    android:name="android.app.NativeActivity"
                     android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
                     android:screenOrientation="sensorLandscape"
                     android:exported="true">
