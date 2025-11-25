@@ -1,0 +1,3 @@
+C:/ВИРФЦНГЕВИРНФЕГВИФЕНЫПГИВФНЕПГЫВИ/hacker-sim-raylib/build/CMakeFiles/HackerSim.dir
+C:/ВИРФЦНГЕВИРНФЕГВИФЕНЫПГИВФНЕПГЫВИ/hacker-sim-raylib/build/CMakeFiles/edit_cache.dir
+C:/ВИРФЦНГЕВИРНФЕГВИФЕНЫПГИВФНЕПГЫВИ/hacker-sim-raylib/build/CMakeFiles/rebuild_cache.dir

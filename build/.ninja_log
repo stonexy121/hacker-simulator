@@ -1,0 +1,13 @@
+# ninja log v6
+33	114	7857300529284038	CMakeFiles/HackerSim.dir/src/story.cpp.obj	a7801a09b059aa8b
+12	856	7857300529067744	CMakeFiles/HackerSim.dir/src/main.cpp.obj	216d283735a2888e
+26	1114	7857300529217941	CMakeFiles/HackerSim.dir/src/graphics.cpp.obj	557ae43d3f65a190
+41	1119	7857300529370400	CMakeFiles/HackerSim.dir/src/hacking.cpp.obj	28e1d8292fc3acab
+19	1136	7857300529156946	CMakeFiles/HackerSim.dir/src/game.cpp.obj	97748057b5436c2f
+31	51	7857302674891239	clean	423d399e6810f01
+22	839	7857302675458587	CMakeFiles/HackerSim.dir/src/main.cpp.obj	216d283735a2888e
+38	960	7857302675624105	CMakeFiles/HackerSim.dir/src/graphics.cpp.obj	557ae43d3f65a190
+54	969	7857302675778926	CMakeFiles/HackerSim.dir/src/hacking.cpp.obj	28e1d8292fc3acab
+31	1123	7857302675547288	CMakeFiles/HackerSim.dir/src/game.cpp.obj	97748057b5436c2f
+46	1131	7857302675702700	CMakeFiles/HackerSim.dir/src/story.cpp.obj	a7801a09b059aa8b
+1132	2819	7857302686556800	HackerSim.exe	8d8eb398fbf32f6b
