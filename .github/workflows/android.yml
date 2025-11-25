@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -21,12 +21,24 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
     
+    - name: Install CMake and NDK
+      run: |
+        yes | sdkmanager --install "cmake;3.22.1" "ndk;26.1.10909125"
+    
     - name: Clone Raymob template
       run: |
         git clone https://github.com/Bigfoot71/Raymob.git android-build
-        cp -r src/* android-build/app/src/main/cpp/
+        rm android-build/app/src/main/cpp/main.c
+        cp src/main.cpp src/game.cpp src/graphics.cpp src/story.cpp src/hacking.cpp src/systems.cpp android-build/app/src/main/cpp/
+        cp src/types.hpp src/hacking.hpp android-build/app/src/main/cpp/
         mkdir -p android-build/app/src/main/assets
-        cp -r resources/* android-build/app/src/main/assets/ || true
+        cp resources/* android-build/app/src/main/assets/ || true
+    
+    - name: Patch main.cpp for Android
+      run: |
+        sed -i '1s/^/#include "raymob.h"\n/' android-build/app/src/main/cpp/main.cpp
+        sed -i 's/InitWindow(W, H,/InitWindow(0, 0,/' android-build/app/src/main/cpp/main.cpp
+        sed -i 's|resources/JetBrainsMono.ttf|JetBrainsMono.ttf|' android-build/app/src/main/cpp/main.cpp
     
     - name: Build APK
       working-directory: android-build
