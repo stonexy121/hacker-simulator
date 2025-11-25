@@ -17,16 +17,22 @@ std::map<std::string, bool> gFlags;
 std::deque<std::pair<std::string, Color>> gLog;
 
 // Сенсорное управление
-bool gTouchMode = false;
+bool gTouchMode = true; // Всегда true для мобильной версии
 Vector2 gTouchPos = {0, 0};
 bool gTouchPressed = false, gTouchReleased = false;
+float gTouchHoldTime = 0;
 
 HackGame gHack;
 
 // Проверка касания области
 bool TouchInRect(int x, int y, int w, int h) {
-    return gTouchPressed && gTouchPos.x >= x && gTouchPos.x <= x + w &&
+    return gTouchPos.x >= x && gTouchPos.x <= x + w &&
            gTouchPos.y >= y && gTouchPos.y <= y + h;
+}
+
+// Проверка тапа (короткое касание) в области
+bool TappedRect(int x, int y, int w, int h) {
+    return gTouchReleased && gTouchHoldTime < 0.3f && TouchInRect(x, y, w, h);
 }
 
 void AddLog(const std::string& t, Color c) {
@@ -39,14 +45,16 @@ void DrawIntro() {
     float a = std::min(1.f, gScrTime);
     float p = 0.5f + 0.5f * sinf(gTime * 2);
     
-    // Анимированный логотип
-    DrawNeonText("HACKER", W/2 - 130, H/2 - 100, 52, {0, (unsigned char)(255*p), 255, (unsigned char)(a*255)});
-    DrawNeonText("SIMULATOR", W/2 - 170, H/2 - 30, 52, {255, 0, 128, (unsigned char)(a*255)});
-    DrawNeonText("G E N E S I S", W/2 - 110, H/2 + 50, 22, {200, 200, 200, (unsigned char)(a*200)});
+    // Анимированный логотип - масштабируемый
+    int titleSize = Sc(52);
+    int subSize = Sc(22);
+    DrawNeonText("HACKER", W/2 - Sc(130), H/2 - Sc(100), titleSize, {0, (unsigned char)(255*p), 255, (unsigned char)(a*255)});
+    DrawNeonText("SIMULATOR", W/2 - Sc(170), H/2 - Sc(30), titleSize, {255, 0, 128, (unsigned char)(a*255)});
+    DrawNeonText("G E N E S I S", W/2 - Sc(110), H/2 + Sc(50), subSize, {200, 200, 200, (unsigned char)(a*200)});
     
     // Декоративные линии
-    float lw = 300 * std::min(1.f, gScrTime * 0.5f);
-    DrawRectangle((int)(W/2 - lw/2), H/2 + 90, (int)lw, 2, {0, 255, 255, (unsigned char)(a*150)});
+    float lw = Sc(300) * std::min(1.f, gScrTime * 0.5f);
+    DrawRectangle((int)(W/2 - lw/2), H/2 + Sc(90), (int)lw, 2, {0, 255, 255, (unsigned char)(a*150)});
     
     if (gScrTime > 2) {
         float b = 0.5f + 0.5f * sinf(gTime * 3);
@@ -63,37 +71,50 @@ void DrawMenu() {
     DrawRectangle(0, 0, W, H, {0, 0, 0, 180});
     
     float p = 0.7f + 0.3f * sinf(gTime * 2);
-    DrawNeonText("HACKER SIMULATOR", W/2 - 220, 60, 46, {0, (unsigned char)(255*p), 255, 255});
-    DrawNeonText("GENESIS", W/2 - 90, 115, 36, C_MAG);
+    int titleSize = Sc(40);
+    int subSize = Sc(28);
+    DrawNeonText("HACKER SIMULATOR", W/2 - Sc(200), Sc(50), titleSize, {0, (unsigned char)(255*p), 255, 255});
+    DrawNeonText("GENESIS", W/2 - Sc(80), Sc(100), subSize, C_MAG);
     
     // Декор
-    DrawRectangle(W/2 - 250, 165, 500, 2, {0, 255, 255, 100});
+    DrawRectangle(W/2 - Sc(200), Sc(140), Sc(400), 2, {0, 255, 255, 100});
     
-    const char* opts[] = {u8"НОВАЯ ИГРА", u8"МАГАЗИН", u8"ДОСТИЖЕНИЯ", u8"ВЫХОД"};
+    // Кнопки меню - большие для пальцев
+    const char* opts[] = {u8"▶ НОВАЯ ИГРА", u8"🛒 МАГАЗИН", u8"🏆 ДОСТИЖЕНИЯ", u8"✕ ВЫХОД"};
+    int btnW = Sc(350);
+    int btnH = Sc(65);
+    int btnPad = Sc(15);
+    int startY = Sc(170);
+    
     for (int i = 0; i < 4; i++) {
-        int y = 220 + i * 65;
+        int x = W/2 - btnW/2;
+        int y = startY + i * (btnH + btnPad);
         bool s = i == gMenuSel;
-        if (s) {
-            DrawPanel(W/2 - 160, y - 12, 320, 55, C_CYAN);
-            float ar = sinf(gTime * 5) * 8;
-            DrawText2(">", W/2 - 185 + (int)ar, y + 5, 28, C_CYAN);
-            DrawText2("<", W/2 + 165 - (int)ar, y + 5, 28, C_CYAN);
-        }
-        DrawText2(opts[i], W/2 - MeasureText2(opts[i], 26)/2, y + 5, 26, s ? C_WHITE : C_GRAY);
+        
+        // Подсветка при касании
+        bool touching = gTouchPressed && TouchInRect(x, y, btnW, btnH);
+        
+        Color bg = s ? Color{0, 60, 80, 220} : Color{15, 25, 40, 200};
+        if (touching) bg = {0, 100, 120, 255};
+        
+        DrawRectangleRounded({(float)x, (float)y, (float)btnW, (float)btnH}, 0.15f, 8, bg);
+        DrawRectangleRoundedLinesEx({(float)x, (float)y, (float)btnW, (float)btnH}, 0.15f, 8, 2, s ? C_CYAN : C_GRAY);
+        
+        int fontSize = Sc(24);
+        int textW = MeasureText2(opts[i], fontSize);
+        DrawText2(opts[i], x + (btnW - textW)/2, y + (btnH - fontSize)/2, fontSize, s ? C_WHITE : C_GRAY);
     }
     
-    // Статистика
-    DrawPanel(50, H - 120, 250, 100, C_CYAN);
-    DrawText2(u8"СТАТИСТИКА", 70, H - 110, 14, C_CYAN);
+    // Статистика внизу
+    int statY = H - Sc(60);
     char buf[64];
-    snprintf(buf, 64, u8"Взломов: %d  Кредиты: %d", gTotalHacks, gCredits);
-    DrawText2(buf, 70, H - 85, 14, C_GRAY);
+    snprintf(buf, 64, u8"💰 %d  |  🔓 %d взломов", gCredits, gTotalHacks);
+    DrawText2(buf, Sc(20), statY, Sc(16), C_GRAY);
+    
     int unlocked = 0;
     for (auto& a : gAchievements) if (a.unlocked) unlocked++;
-    snprintf(buf, 64, u8"Достижения: %d/%d", unlocked, (int)gAchievements.size());
-    DrawText2(buf, 70, H - 65, 14, C_GRAY);
-    
-    DrawText2(u8"v2.0 FULL // 10 глав // 3 концовки", 20, H - 25, 12, C_GRAY);
+    snprintf(buf, 64, u8"🏆 %d/%d", unlocked, (int)gAchievements.size());
+    DrawText2(buf, W - Sc(120), statY, Sc(16), C_GRAY);
 }
 
 void DrawGame() {
@@ -228,54 +249,72 @@ void UpdateGame(float dt) {
     gTypeTimer += dt;
     
     // Обновление сенсорного ввода
-    #ifdef PLATFORM_ANDROID
-    gTouchMode = true;
-    #else
-    gTouchMode = GetTouchPointCount() > 0;
-    #endif
+    gTouchMode = true; // Всегда мобильный режим
     
-    gTouchPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || (GetTouchPointCount() > 0 && IsGestureDetected(GESTURE_TAP));
+    // Отслеживание касания
+    bool wasTouching = gTouchPressed || IsMouseButtonDown(MOUSE_LEFT_BUTTON);
+    gTouchPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     gTouchReleased = IsMouseButtonReleased(MOUSE_LEFT_BUTTON);
     gTouchPos = GetTouchPointCount() > 0 ? GetTouchPosition(0) : GetMousePosition();
     
-    // Универсальный ввод: Enter или касание
-    bool inputConfirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || gTouchPressed;
+    // Время удержания
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) || GetTouchPointCount() > 0) {
+        gTouchHoldTime += dt;
+    } else {
+        gTouchHoldTime = 0;
+    }
+    
+    // Размеры кнопок меню (должны совпадать с DrawMenu)
+    int btnW = Sc(350);
+    int btnH = Sc(65);
+    int btnPad = Sc(15);
+    int startY = Sc(170);
     
     switch (gScr) {
     case Scr::Intro:
-        if (gScrTime > 1.5f && inputConfirm) {
+        // Любое касание - переход в меню
+        if (gScrTime > 1.5f && (gTouchReleased || IsKeyPressed(KEY_ENTER))) {
             gScr = Scr::Menu; gScrTime = 0; TriggerGlitch(0.5f);
             SpawnParticles({(float)W/2.f, (float)H/2.f}, C_CYAN, 30);
         }
         break;
         
     case Scr::Menu: {
-        // Сенсорное управление меню
-        if (gTouchMode && gTouchPressed) {
-            for (int i = 0; i < 4; i++) {
-                int y = 220 + i * 65;
-                if (TouchInRect(W/2 - 160, y - 12, 320, 55)) {
-                    gMenuSel = i;
-                    inputConfirm = true;
-                    break;
+        // Сенсорное управление меню - проверяем тап по кнопкам
+        for (int i = 0; i < 4; i++) {
+            int x = W/2 - btnW/2;
+            int y = startY + i * (btnH + btnPad);
+            
+            if (TappedRect(x, y, btnW, btnH)) {
+                gMenuSel = i;
+                SpawnParticles({(float)W/2.f, (float)y + btnH/2}, C_CYAN, 25);
+                TriggerGlitch(0.3f);
+                
+                if (i == 0) { // Новая игра
+                    gScr = Scr::Game; gScene = 0; gLine = 0; gDispText.clear();
+                    gCredits = 100; gKarma = 0; gMenuSel = 0; gFlags.clear(); gLog.clear();
+                    InitSystems();
+                    AddLog(u8">>> Система инициализирована", C_CYAN);
+                    AddLog(u8">>> Добро пожаловать, оператор", C_GREEN);
+                } else if (i == 1) { // Магазин
+                    gScr = Scr::Shop; gMenuSel = 0;
+                } else if (i == 3) { // Выход
+                    CloseWindow();
                 }
+                break;
             }
         }
         
-        if (IsKeyPressed(KEY_UP)) { gMenuSel = (gMenuSel - 1 + 4) % 4; SpawnParticles({(float)W/2.f, 220.f + gMenuSel * 65}, C_CYAN, 5); }
-        if (IsKeyPressed(KEY_DOWN)) { gMenuSel = (gMenuSel + 1) % 4; SpawnParticles({(float)W/2.f, 220.f + gMenuSel * 65}, C_CYAN, 5); }
-        if (IsKeyPressed(KEY_ENTER) || (gTouchMode && gTouchPressed && TouchInRect(W/2 - 160, 220 + gMenuSel * 65 - 12, 320, 55))) {
-            SpawnParticles({(float)W/2.f, 220.f + gMenuSel * 65}, C_CYAN, 25);
-            TriggerGlitch(0.3f);
+        // Клавиатура (для ПК)
+        if (IsKeyPressed(KEY_UP)) gMenuSel = (gMenuSel - 1 + 4) % 4;
+        if (IsKeyPressed(KEY_DOWN)) gMenuSel = (gMenuSel + 1) % 4;
+        if (IsKeyPressed(KEY_ENTER)) {
             if (gMenuSel == 0) {
                 gScr = Scr::Game; gScene = 0; gLine = 0; gDispText.clear();
-                gCredits = 100; gKarma = 0; gMenuSel = 0; gFlags.clear(); gLog.clear();
+                gCredits = 100; gKarma = 0; gFlags.clear(); gLog.clear();
                 InitSystems();
-                AddLog(u8">>> Система инициализирована", C_CYAN);
-                AddLog(u8">>> Добро пожаловать, оператор", C_GREEN);
-            } else if (gMenuSel == 1) {
-                gScr = Scr::Shop; gMenuSel = 0;
-            } else if (gMenuSel == 3) CloseWindow();
+            } else if (gMenuSel == 1) gScr = Scr::Shop;
+            else if (gMenuSel == 3) CloseWindow();
         }
         break;
     }
@@ -285,10 +324,9 @@ void UpdateGame(float dt) {
         if (gLine < (int)sc.dlg.size()) {
             if (gTypeTimer > 0.018f && gTypeIdx < (int)gDispText.size()) {
                 gTypeIdx++; gTypeTimer = 0;
-                if (rand() % 8 == 0) SpawnParticles({60.f + gTypeIdx * 8.f, 150}, C_CYAN, 1);
             }
-            // Касание или Enter для продолжения диалога
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || gTouchPressed) {
+            // Тап для продолжения диалога
+            if (gTouchReleased || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
                 if (gTypeIdx < (int)gDispText.size()) gTypeIdx = gDispText.size();
                 else { gLine++; gDispText.clear(); gTypeIdx = 0; SpawnParticles({(float)W/2.f, (float)H/2.f}, C_CYAN, 8); }
             }
@@ -296,26 +334,28 @@ void UpdateGame(float dt) {
             int n = (int)sc.ch.size();
             if (n == 0) return;
             
-            // Сенсорный выбор вариантов
-            if (gTouchMode && gTouchPressed) {
-                for (int i = 0; i < n; i++) {
-                    int y = 120 + i * 55;
-                    if (TouchInRect(50, y, W - 100, 50)) {
-                        gMenuSel = i;
-                    }
+            // Размеры кнопок выбора
+            int choiceBtnH = Sc(55);
+            int choiceBtnPad = Sc(10);
+            int choiceStartY = Sc(150);
+            int choiceBtnW = W - Sc(100);
+            int choiceX = Sc(50);
+            
+            // Сенсорный выбор вариантов - тап по кнопке
+            bool choiceConfirm = false;
+            for (int i = 0; i < n; i++) {
+                int y = choiceStartY + i * (choiceBtnH + choiceBtnPad);
+                if (TappedRect(choiceX, y, choiceBtnW, choiceBtnH)) {
+                    gMenuSel = i;
+                    choiceConfirm = true;
+                    break;
                 }
             }
             
-            if (IsKeyPressed(KEY_UP)) { gMenuSel = (gMenuSel - 1 + n) % n; SpawnParticles({100, 145.f + gMenuSel * 55}, C_CYAN, 3); }
-            if (IsKeyPressed(KEY_DOWN)) { gMenuSel = (gMenuSel + 1) % n; SpawnParticles({100, 145.f + gMenuSel * 55}, C_CYAN, 3); }
-            for (int i = 0; i < std::min(n, 9); i++) if (IsKeyPressed(KEY_ONE + i)) gMenuSel = i;
-            
-            // Подтверждение выбора
-            bool choiceConfirm = IsKeyPressed(KEY_ENTER);
-            if (gTouchMode && gTouchPressed) {
-                int y = 120 + gMenuSel * 55;
-                if (TouchInRect(50, y, W - 100, 50)) choiceConfirm = true;
-            }
+            // Клавиатура
+            if (IsKeyPressed(KEY_UP)) gMenuSel = (gMenuSel - 1 + n) % n;
+            if (IsKeyPressed(KEY_DOWN)) gMenuSel = (gMenuSel + 1) % n;
+            if (IsKeyPressed(KEY_ENTER)) choiceConfirm = true;
             
             if (choiceConfirm) {
                 DChoice& c = sc.ch[gMenuSel];
@@ -326,16 +366,14 @@ void UpdateGame(float dt) {
                 if (c.karma < 0) AddLog(u8">>> -Карма", C_RED);
                 if (sc.creditsReward > 0) AddLog(u8">>> +" + std::to_string(sc.creditsReward) + u8" кредитов", C_YELLOW);
                 TriggerGlitch(0.25f);
-                SpawnParticles({W/2.f, H/2.f}, C_CYAN, 20);
+                SpawnParticles({(float)W/2.f, (float)H/2.f}, C_CYAN, 20);
                 
                 gTotalChoices++;
-                // Репутация фракций
                 if (sc.unlocks == "ch2" || sc.unlocks == "ch4") gRep["ghost"] += 10;
                 if (sc.unlocks == "shadow" || sc.unlocks == "oracle") gRep["shadow"] += 15;
                 
                 CheckAchievements();
                 
-                // Случайное событие между главами
                 if (sc.unlocks.find("ch") == 0 && rand() % 3 == 0) {
                     TriggerRandomEvent();
                 }
@@ -383,7 +421,7 @@ void UpdateGame(float dt) {
         break;
         
     case Scr::End:
-        if (IsKeyPressed(KEY_ENTER)) { gScr = Scr::Menu; gScrTime = 0; gMenuSel = 0; }
+        if (gTouchReleased || IsKeyPressed(KEY_ENTER)) { gScr = Scr::Menu; gScrTime = 0; gMenuSel = 0; }
         break;
         
     case Scr::Shop: {

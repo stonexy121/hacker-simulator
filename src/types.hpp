@@ -5,18 +5,13 @@
 #include <deque>
 #include <map>
 
-// Размеры экрана (динамические для Android)
-#ifdef PLATFORM_ANDROID
-    #define W GetScreenWidth()
-    #define H GetScreenHeight()
-#else
-    constexpr int W = 1280, H = 720;
-#endif
+// Размеры экрана - всегда динамические для поддержки разных устройств
+#define W GetScreenWidth()
+#define H GetScreenHeight()
 
-// Сенсорное управление
-extern bool gTouchMode;
-extern Vector2 gTouchPos;
-extern bool gTouchPressed, gTouchReleased;
+// Масштабирование UI
+inline float UIScale() { return (GetScreenWidth() + GetScreenHeight()) / 2000.0f; }
+inline int Sc(int v) { return (int)(v * UIScale()); } // Scaled value
 
 // Цвета
 inline const Color C_BG = {5,8,15,255};
