@@ -98,49 +98,66 @@ void DrawShop() {
     DrawBackground();
     DrawRectangle(0, 0, W, H, {0, 0, 0, 200});
     
-    DrawPanel(50, 40, W - 100, 60, C_CYAN);
-    DrawNeonText(u8"[ ЧЁРНЫЙ РЫНОК ]", 70, 55, 32, C_CYAN);
+    // Заголовок
+    int headerH = Sc(60);
+    DrawPanel(Sc(50), Sc(30), W - Sc(100), headerH, C_CYAN);
+    DrawNeonText(u8"[ ЧЁРНЫЙ РЫНОК ]", Sc(70), Sc(45), Sc(28), C_CYAN);
     
     char buf[64];
-    snprintf(buf, 64, u8"Кредиты: %d", gCredits);
-    DrawText2(buf, W - 250, 60, 20, C_YELLOW);
+    snprintf(buf, 64, u8"💰 %d", gCredits);
+    DrawText2(buf, W - Sc(200), Sc(50), Sc(20), C_YELLOW);
     
-    int y = 120;
+    // Улучшения
+    int itemH = Sc(70);
+    int itemPad = Sc(10);
+    int startY = Sc(120);
+    int itemX = Sc(50);
+    int itemW = W - Sc(100);
+    
     for (int i = 0; i < (int)gUpgrades.size(); i++) {
         auto& u = gUpgrades[i];
+        int y = startY + i * (itemH + itemPad);
         bool sel = i == gMenuSel;
-        bool canBuy = gCredits >= u.cost && u.level < u.maxLevel;
+        bool canBuy = gCredits >= u.cost * (u.level + 1) && u.level < u.maxLevel;
         
         Color borderCol = sel ? C_CYAN : C_GRAY;
         if (u.level >= u.maxLevel) borderCol = C_GREEN;
         
-        DrawPanel(60, y, W - 120, 70, borderCol);
+        // Фон кнопки
+        Color bg = sel ? Color{0, 40, 60, 220} : Color{15, 25, 40, 200};
+        DrawRectangleRounded({(float)itemX, (float)y, (float)itemW, (float)itemH}, 0.1f, 8, bg);
+        DrawRectangleRoundedLinesEx({(float)itemX, (float)y, (float)itemW, (float)itemH}, 0.1f, 8, 2, borderCol);
         
         // Название и описание
-        DrawText2(u.name.c_str(), 80, y + 10, 20, sel ? C_WHITE : C_GRAY);
-        DrawText2(u.desc.c_str(), 80, y + 35, 14, C_GRAY);
+        DrawText2(u.name.c_str(), itemX + Sc(20), y + Sc(12), Sc(18), sel ? C_WHITE : C_GRAY);
+        DrawText2(u.desc.c_str(), itemX + Sc(20), y + Sc(38), Sc(14), C_GRAY);
         
-        // Уровень
+        // Уровень (точки)
+        int dotX = W - Sc(200);
         for (int l = 0; l < u.maxLevel; l++) {
             Color lc = l < u.level ? C_GREEN : Color{40, 50, 60, 255};
-            DrawRectangle(W - 280 + l * 25, y + 15, 20, 20, lc);
-            DrawRectangleLinesEx({(float)(W - 280 + l * 25), (float)(y + 15), 20, 20}, 1, C_CYAN);
+            DrawCircle(dotX + l * Sc(25), y + Sc(35), Sc(8), lc);
+            DrawCircleLines(dotX + l * Sc(25), y + Sc(35), Sc(8), C_CYAN);
         }
         
-        // Цена
+        // Цена или статус
         if (u.level < u.maxLevel) {
             snprintf(buf, 64, "%d", u.cost * (u.level + 1));
-            DrawText2(buf, W - 150, y + 25, 18, canBuy ? C_YELLOW : C_RED);
-            DrawText2(u8"кр", W - 100, y + 28, 14, C_GRAY);
+            DrawText2(buf, W - Sc(120), y + Sc(25), Sc(18), canBuy ? C_YELLOW : C_RED);
         } else {
-            DrawText2(u8"МАКС", W - 140, y + 25, 16, C_GREEN);
+            DrawText2(u8"✓", W - Sc(100), y + Sc(20), Sc(24), C_GREEN);
         }
-        
-        y += 80;
     }
     
-    DrawPanel(50, H - 70, W - 100, 50, C_CYAN);
-    DrawText2(u8"[↑↓] Выбор   [ENTER] Купить   [ESC] Назад", 70, H - 55, 16, C_GRAY);
+    // Кнопка "Назад" - большая для пальцев
+    int backY = H - Sc(80);
+    int backH = Sc(60);
+    DrawRectangleRounded({(float)itemX, (float)backY, (float)itemW, (float)backH}, 0.15f, 8, {60, 20, 20, 220});
+    DrawRectangleRoundedLinesEx({(float)itemX, (float)backY, (float)itemW, (float)backH}, 0.15f, 8, 2, C_RED);
+    
+    const char* backText = u8"← НАЗАД";
+    int backTextW = MeasureText2(backText, Sc(22));
+    DrawText2(backText, itemX + (itemW - backTextW)/2, backY + Sc(18), Sc(22), C_WHITE);
 }
 
 void DrawEvent() {
@@ -148,46 +165,55 @@ void DrawEvent() {
     DrawCity();
     DrawRectangle(0, 0, W, H, {0, 0, 0, 220});
     
-    DrawPanel(100, H/2 - 120, W - 200, 240, C_CYAN);
+    int panelX = Sc(80);
+    int panelW = W - Sc(160);
+    int panelH = Sc(280);
+    int panelY = (H - panelH) / 2;
     
-    DrawNeonText(u8"[ СОБЫТИЕ ]", W/2 - 80, H/2 - 100, 24, C_CYAN);
+    DrawPanel(panelX, panelY, panelW, panelH, C_CYAN);
+    
+    DrawNeonText(u8"[ СОБЫТИЕ ]", W/2 - Sc(80), panelY + Sc(20), Sc(24), C_CYAN);
     
     // Текст события с переносом
     std::string text = gCurrentEvent.text;
-    int maxW = W - 280;
+    int maxW = panelW - Sc(60);
+    int fontSize = Sc(18);
     std::string line;
-    int ly = H/2 - 50;
+    int ly = panelY + Sc(70);
     for (size_t i = 0; i < text.size(); i++) {
         line += text[i];
-        if (MeasureText2(line.c_str(), 18) > maxW || text[i] == '\n') {
-            DrawText2(line.c_str(), 130, ly, 18, C_WHITE);
-            ly += 25;
+        if (MeasureText2(line.c_str(), fontSize) > maxW || text[i] == '\n') {
+            DrawText2(line.c_str(), panelX + Sc(30), ly, fontSize, C_WHITE);
+            ly += Sc(28);
             line.clear();
         }
     }
-    if (!line.empty()) DrawText2(line.c_str(), 130, ly, 18, C_WHITE);
+    if (!line.empty()) DrawText2(line.c_str(), panelX + Sc(30), ly, fontSize, C_WHITE);
     
     // Эффекты
-    ly = H/2 + 30;
+    ly = panelY + Sc(160);
     char buf[64];
     if (gCurrentEvent.credits != 0) {
         snprintf(buf, 64, "%s%d кредитов", gCurrentEvent.credits > 0 ? "+" : "", gCurrentEvent.credits);
-        DrawText2(buf, 130, ly, 16, gCurrentEvent.credits > 0 ? C_GREEN : C_RED);
-        ly += 22;
+        DrawText2(buf, panelX + Sc(30), ly, Sc(16), gCurrentEvent.credits > 0 ? C_GREEN : C_RED);
+        ly += Sc(24);
     }
     if (gCurrentEvent.karma != 0) {
         snprintf(buf, 64, "%s%d карма", gCurrentEvent.karma > 0 ? "+" : "", gCurrentEvent.karma);
-        DrawText2(buf, 130, ly, 16, gCurrentEvent.karma > 0 ? C_GREEN : C_RED);
-        ly += 22;
+        DrawText2(buf, panelX + Sc(30), ly, Sc(16), gCurrentEvent.karma > 0 ? C_GREEN : C_RED);
+        ly += Sc(24);
     }
     if (gCurrentEvent.rep != 0 && !gCurrentEvent.faction.empty()) {
         const char* fname = gCurrentEvent.faction == "ghost" ? "Ghost Protocol" : "Shadow Brokers";
         snprintf(buf, 64, "%s%d репутация (%s)", gCurrentEvent.rep > 0 ? "+" : "", gCurrentEvent.rep, fname);
-        DrawText2(buf, 130, ly, 16, gCurrentEvent.rep > 0 ? C_CYAN : C_RED);
+        DrawText2(buf, panelX + Sc(30), ly, Sc(16), gCurrentEvent.rep > 0 ? C_CYAN : C_RED);
     }
     
+    // Кнопка продолжить
     float b = 0.5f + 0.5f * sinf(gTime * 3);
-    DrawText2(u8"[ ENTER - Продолжить ]", W/2 - 100, H/2 + 90, 16, {200, 200, 200, (unsigned char)(b * 255)});
+    const char* contText = u8"[ КОСНИТЕСЬ ДЛЯ ПРОДОЛЖЕНИЯ ]";
+    int contW = MeasureText2(contText, Sc(18));
+    DrawText2(contText, (W - contW)/2, panelY + panelH - Sc(40), Sc(18), {200, 200, 200, (unsigned char)(b * 255)});
 }
 
 void DrawHUD() {

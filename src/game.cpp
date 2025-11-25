@@ -426,6 +426,43 @@ void UpdateGame(float dt) {
         
     case Scr::Shop: {
         int n = (int)gUpgrades.size();
+        
+        // Размеры кнопок магазина
+        int itemH = Sc(70);
+        int itemPad = Sc(10);
+        int startY = Sc(120);
+        int itemW = W - Sc(100);
+        int itemX = Sc(50);
+        int backBtnY = H - Sc(80);
+        int backBtnH = Sc(60);
+        
+        // Тап по улучшениям
+        for (int i = 0; i < n; i++) {
+            int y = startY + i * (itemH + itemPad);
+            if (TappedRect(itemX, y, itemW, itemH)) {
+                gMenuSel = i;
+                auto& u = gUpgrades[gMenuSel];
+                int cost = u.cost * (u.level + 1);
+                if (gCredits >= cost && u.level < u.maxLevel) {
+                    gCredits -= cost;
+                    u.level++;
+                    AddLog(u8">>> Куплено: " + u.name, C_GREEN);
+                    SpawnParticles({(float)W/2.f, (float)y}, C_GREEN, 20);
+                    if (u.id == "neural") gHackBonus += 15;
+                    if (u.id == "stealth") gTraceReduce += 20;
+                    if (u.id == "chrono") gTimeBonus += 10;
+                }
+                break;
+            }
+        }
+        
+        // Кнопка "Назад"
+        if (TappedRect(itemX, backBtnY, itemW, backBtnH)) {
+            gScr = Scr::Menu; gMenuSel = 0;
+            TriggerGlitch(0.2f);
+        }
+        
+        // Клавиатура
         if (IsKeyPressed(KEY_UP)) gMenuSel = (gMenuSel - 1 + n) % n;
         if (IsKeyPressed(KEY_DOWN)) gMenuSel = (gMenuSel + 1) % n;
         if (IsKeyPressed(KEY_ENTER)) {
@@ -435,19 +472,18 @@ void UpdateGame(float dt) {
                 gCredits -= cost;
                 u.level++;
                 AddLog(u8">>> Куплено: " + u.name, C_GREEN);
-                SpawnParticles({W/2.f, 120.f + gMenuSel * 80}, C_GREEN, 20);
-                // Применить бонусы
                 if (u.id == "neural") gHackBonus += 15;
                 if (u.id == "stealth") gTraceReduce += 20;
                 if (u.id == "chrono") gTimeBonus += 10;
             }
         }
-        if (IsKeyPressed(KEY_ESCAPE)) { gScr = Scr::Menu; gMenuSel = 0; }
+        if (IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACK)) { gScr = Scr::Menu; gMenuSel = 0; }
         break;
     }
     
     case Scr::Event:
-        if (IsKeyPressed(KEY_ENTER)) {
+        // Тап для подтверждения события
+        if (gTouchReleased || IsKeyPressed(KEY_ENTER)) {
             gCredits += gCurrentEvent.credits;
             gKarma += gCurrentEvent.karma;
             if (!gCurrentEvent.faction.empty()) gRep[gCurrentEvent.faction] += gCurrentEvent.rep;
