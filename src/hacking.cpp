@@ -88,15 +88,57 @@ void InitHackGame(HackGame& h, HackType type, int difficulty) {
     }
 }
 
+// Глобальные переменные для тача в хакинге
+static bool hTouchReleased = false;
+static Vector2 hTouchPos = {0, 0};
+
 void UpdateHackGame(HackGame& h, float dt) {
     if (h.completed || h.failed) return;
     
     h.timer -= dt;
     if (h.timer <= 0) { h.failed = true; return; }
     
+    // Обновление тача
+    hTouchReleased = IsMouseButtonReleased(MOUSE_LEFT_BUTTON);
+    hTouchPos = GetTouchPointCount() > 0 ? GetTouchPosition(0) : GetMousePosition();
+    
+    // Хелпер для проверки тапа
+    auto Tapped = [](int x, int y, int w, int h) {
+        return hTouchReleased && 
+               hTouchPos.x >= x && hTouchPos.x <= x + w &&
+               hTouchPos.y >= y && hTouchPos.y <= y + h;
+    };
+    
     switch (h.type) {
     case HackType::CodeBreak: {
-        // Ввод цифр
+        // Экранная клавиатура - позиция
+        int keyW = Sc(60), keyH = Sc(55), keyPad = Sc(8);
+        int keysStartX = W/2 - (5 * keyW + 4 * keyPad) / 2;
+        int keysStartY = H - Sc(180);
+        
+        // Тап по цифрам 0-9
+        for (int i = 0; i < 10; i++) {
+            int row = i / 5, col = i % 5;
+            int kx = keysStartX + col * (keyW + keyPad);
+            int ky = keysStartY + row * (keyH + keyPad);
+            if (Tapped(kx, ky, keyW, keyH) && (int)h.playerCode.size() < (int)h.secretCode.size()) {
+                h.playerCode += '0' + i;
+            }
+        }
+        
+        // Кнопка удаления
+        int delX = keysStartX + 5 * (keyW + keyPad);
+        if (Tapped(delX, keysStartY, keyW, keyH) && !h.playerCode.empty()) {
+            h.playerCode.pop_back();
+        }
+        
+        // Кнопка подтверждения
+        if (Tapped(delX, keysStartY + keyH + keyPad, keyW, keyH) && 
+            (int)h.playerCode.size() == (int)h.secretCode.size()) {
+            // Проверка кода - ниже
+        }
+        
+        // Клавиатура
         for (int k = KEY_ZERO; k <= KEY_NINE; k++) {
             if (IsKeyPressed(k) && (int)h.playerCode.size() < (int)h.secretCode.size()) {
                 h.playerCode += '0' + (k - KEY_ZERO);
@@ -110,7 +152,10 @@ void UpdateHackGame(HackGame& h, float dt) {
         if (IsKeyPressed(KEY_BACKSPACE) && !h.playerCode.empty()) {
             h.playerCode.pop_back();
         }
-        if (IsKeyPressed(KEY_ENTER) && (int)h.playerCode.size() == (int)h.secretCode.size()) {
+        
+        bool confirmCode = IsKeyPressed(KEY_ENTER) || 
+                          (Tapped(delX, keysStartY + keyH + keyPad, keyW, keyH));
+        if (confirmCode && (int)h.playerCode.size() == (int)h.secretCode.size()) {
             h.attempts++;
             int correct = 0, wrongPos = 0;
             std::string tempSecret = h.secretCode, tempPlayer = h.playerCode;
@@ -152,6 +197,29 @@ void UpdateHackGame(HackGame& h, float dt) {
                 }
             }
         } else {
+            // Сетка 3x3 - тап по ячейкам
+            int cellSize = Sc(90);
+            int cellPad = Sc(10);
+            int gx = W/2 - (3 * cellSize + 2 * cellPad) / 2;
+            int gy = Sc(180);
+            
+            for (int i = 0; i < 9; i++) {
+                int col = i % 3, row = i / 3;
+                int cx = gx + col * (cellSize + cellPad);
+                int cy = gy + row * (cellSize + cellPad);
+                
+                if (Tapped(cx, cy, cellSize, cellSize)) {
+                    h.playerSeq.push_back(i);
+                    if (h.playerSeq.back() != h.sequence[h.playerSeq.size()-1]) {
+                        h.failed = true;
+                    } else if (h.playerSeq.size() == h.sequence.size()) {
+                        h.completed = true;
+                    }
+                    h.trace += 2;
+                }
+            }
+            
+            // Клавиатура
             for (int k = KEY_ONE; k <= KEY_NINE; k++) {
                 if (IsKeyPressed(k)) {
                     int num = k - KEY_ONE;
@@ -169,6 +237,23 @@ void UpdateHackGame(HackGame& h, float dt) {
     }
     case HackType::PacketRoute: {
         int dx = 0, dy = 0;
+        
+        // Кнопки направления на экране
+        int btnSize = Sc(70);
+        int btnPad = Sc(5);
+        int ctrlX = W - Sc(200);
+        int ctrlY = H - Sc(200);
+        
+        // Вверх
+        if (Tapped(ctrlX + btnSize + btnPad, ctrlY, btnSize, btnSize)) dy = -1;
+        // Вниз
+        if (Tapped(ctrlX + btnSize + btnPad, ctrlY + 2*(btnSize + btnPad), btnSize, btnSize)) dy = 1;
+        // Влево
+        if (Tapped(ctrlX, ctrlY + btnSize + btnPad, btnSize, btnSize)) dx = -1;
+        // Вправо
+        if (Tapped(ctrlX + 2*(btnSize + btnPad), ctrlY + btnSize + btnPad, btnSize, btnSize)) dx = 1;
+        
+        // Клавиатура
         if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) dy = -1;
         if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) dy = 1;
         if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) dx = -1;
@@ -187,6 +272,29 @@ void UpdateHackGame(HackGame& h, float dt) {
         break;
     }
     case HackType::Decrypt: {
+        // Экранные кнопки 0-9
+        int keyW = Sc(55), keyH = Sc(50), keyPad = Sc(6);
+        int keysStartX = W/2 - (5 * keyW + 4 * keyPad) / 2;
+        int keysStartY = H - Sc(140);
+        
+        for (int i = 0; i < 10; i++) {
+            int row = i / 5, col = i % 5;
+            int kx = keysStartX + col * (keyW + keyPad);
+            int ky = keysStartY + row * (keyH + keyPad);
+            
+            if (Tapped(kx, ky, keyW, keyH)) {
+                int shift = i;
+                char decrypted = (char)('A' + (h.encrypted[h.patternPos] - 'A' - shift + 26) % 26);
+                if (decrypted == h.decrypted[h.patternPos]) {
+                    h.patternPos++;
+                    if (h.patternPos >= (int)h.decrypted.size()) h.completed = true;
+                } else {
+                    h.trace += 10;
+                }
+            }
+        }
+        
+        // Клавиатура
         for (int k = KEY_ZERO; k <= KEY_NINE; k++) {
             if (IsKeyPressed(k)) {
                 int shift = k - KEY_ZERO;
@@ -202,9 +310,19 @@ void UpdateHackGame(HackGame& h, float dt) {
         break;
     }
     case HackType::Firewall: {
+        // Сенсорное управление - игрок следует за пальцем
+        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) || GetTouchPointCount() > 0) {
+            Vector2 touch = GetTouchPointCount() > 0 ? GetTouchPosition(0) : GetMousePosition();
+            // Плавное движение к точке касания
+            float targetY = touch.y;
+            float diff = targetY - h.playerY;
+            h.playerY += diff * 8 * dt; // Плавность
+        }
+        
+        // Клавиатура
         if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) h.playerY -= 300 * dt;
         if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) h.playerY += 300 * dt;
-        h.playerY = std::max(50.f, std::min((float)H - 50, h.playerY));
+        h.playerY = std::max(160.f, std::min((float)H - 100, h.playerY));
         
         for (auto& b : h.barriers) b -= h.scrollSpeed * dt;
         
@@ -283,17 +401,51 @@ void DrawHackGame(const HackGame& h, Font& font) {
         }
         
         snprintf(buf, 64, u8"Попыток: %d/%d", h.attempts, h.maxAttempts);
-        Text(buf, 70, H - 100, 16, C_YELLOW);
-        Text(u8"[0-9] Ввод  [BACKSPACE] Удалить  [ENTER] Проверить", 300, H - 100, 14, C_GRAY);
+        Text(buf, 70, Sc(130), Sc(16), C_YELLOW);
+        
+        // Экранная клавиатура
+        int keyW = Sc(60), keyH = Sc(55), keyPad = Sc(8);
+        int keysStartX = W/2 - (5 * keyW + 4 * keyPad) / 2;
+        int keysStartY = H - Sc(180);
+        
+        for (int i = 0; i < 10; i++) {
+            int row = i / 5, col = i % 5;
+            int kx = keysStartX + col * (keyW + keyPad);
+            int ky = keysStartY + row * (keyH + keyPad);
+            DrawRectangleRounded({(float)kx, (float)ky, (float)keyW, (float)keyH}, 0.2f, 8, {40, 60, 80, 255});
+            DrawRectangleRoundedLinesEx({(float)kx, (float)ky, (float)keyW, (float)keyH}, 0.2f, 8, 2, C_CYAN);
+            char digit[2] = {(char)('0' + i), 0};
+            Text(digit, kx + keyW/2 - Sc(8), ky + Sc(12), Sc(28), C_WHITE);
+        }
+        
+        // Кнопка удаления
+        int delX = keysStartX + 5 * (keyW + keyPad);
+        DrawRectangleRounded({(float)delX, (float)keysStartY, (float)keyW, (float)keyH}, 0.2f, 8, {80, 40, 40, 255});
+        DrawRectangleRoundedLinesEx({(float)delX, (float)keysStartY, (float)keyW, (float)keyH}, 0.2f, 8, 2, C_RED);
+        Text(u8"←", delX + Sc(15), keysStartY + Sc(12), Sc(28), C_WHITE);
+        
+        // Кнопка подтверждения
+        int okY = keysStartY + keyH + keyPad;
+        Color okCol = (int)h.playerCode.size() == (int)h.secretCode.size() ? C_GREEN : C_GRAY;
+        DrawRectangleRounded({(float)delX, (float)okY, (float)keyW, (float)keyH}, 0.2f, 8, {40, 80, 40, 255});
+        DrawRectangleRoundedLinesEx({(float)delX, (float)okY, (float)keyW, (float)keyH}, 0.2f, 8, 2, okCol);
+        Text(u8"OK", delX + Sc(10), okY + Sc(12), Sc(24), C_WHITE);
         break;
     }
     case HackType::MemoryGrid: {
-        Text(u8"Запомни последовательность и повтори", 70, 140, 14, C_GRAY);
+        Text(u8"Запомни и повтори касанием", Sc(70), Sc(140), Sc(18), C_GRAY);
         
-        // Сетка 3x3
-        int gx = W/2 - 120, gy = 200;
+        // Сетка 3x3 - большие кнопки для пальцев
+        int cellSize = Sc(90);
+        int cellPad = Sc(10);
+        int gx = W/2 - (3 * cellSize + 2 * cellPad) / 2;
+        int gy = Sc(180);
+        
         for (int i = 0; i < 9; i++) {
-            int x = gx + (i % 3) * 80, y = gy + (i / 3) * 80;
+            int col = i % 3, row = i / 3;
+            int x = gx + col * (cellSize + cellPad);
+            int y = gy + row * (cellSize + cellPad);
+            
             bool lit = (h.showPhase == 0 && h.currentShow < (int)h.sequence.size() && 
                        h.sequence[h.currentShow] == i);
             bool done = false;
@@ -301,27 +453,29 @@ void DrawHackGame(const HackGame& h, Font& font) {
                 if (h.sequence[j] == i && j < (int)h.playerSeq.size()) done = true;
             }
             Color c = lit ? C_CYAN : done ? C_GREEN : Color{40, 50, 70, 255};
-            DrawRectangle(x, y, 70, 70, c);
-            DrawRectangleLinesEx({(float)x, (float)y, 70, 70}, 2, C_CYAN);
+            DrawRectangleRounded({(float)x, (float)y, (float)cellSize, (float)cellSize}, 0.15f, 8, c);
+            DrawRectangleRoundedLinesEx({(float)x, (float)y, (float)cellSize, (float)cellSize}, 0.15f, 8, 2, C_CYAN);
             char n[2] = {(char)('1' + i), 0};
-            Text(n, x + 25, y + 20, 24, lit || done ? C_WHITE : C_GRAY);
+            Text(n, x + cellSize/2 - Sc(10), y + cellSize/2 - Sc(15), Sc(32), lit || done ? C_WHITE : C_GRAY);
         }
         
+        int statusY = gy + 3 * (cellSize + cellPad) + Sc(20);
         if (h.showPhase == 0) {
             snprintf(buf, 64, u8"Запоминай: %d/%d", h.currentShow + 1, (int)h.sequence.size());
-            Text(buf, W/2 - 80, gy + 260, 18, C_YELLOW);
+            Text(buf, W/2 - Sc(80), statusY, Sc(22), C_YELLOW);
         } else {
-            snprintf(buf, 64, u8"Введено: %d/%d", (int)h.playerSeq.size(), (int)h.sequence.size());
-            Text(buf, W/2 - 80, gy + 260, 18, C_GREEN);
+            snprintf(buf, 64, u8"Коснись: %d/%d", (int)h.playerSeq.size(), (int)h.sequence.size());
+            Text(buf, W/2 - Sc(80), statusY, Sc(22), C_GREEN);
         }
         break;
     }
     case HackType::PacketRoute: {
-        Text(u8"Доведи пакет до цели. Избегай стен.", 70, 140, 14, C_GRAY);
+        Text(u8"Веди пакет к цели", Sc(70), Sc(140), Sc(18), C_GRAY);
         
-        int cellW = (W - 200) / h.gridW;
-        int cellH = (H - 300) / h.gridH;
-        int ox = 100, oy = 180;
+        // Сетка поменьше чтобы влезли кнопки
+        int cellW = (W - Sc(280)) / h.gridW;
+        int cellH = (H - Sc(250)) / h.gridH;
+        int ox = Sc(60), oy = Sc(170);
         
         for (int y = 0; y < h.gridH; y++) {
             for (int x = 0; x < h.gridW; x++) {
@@ -335,71 +489,114 @@ void DrawHackGame(const HackGame& h, Font& font) {
                 for (int p : h.playerPath) if (p == idx) c = {0, 100, 100, 255};
                 DrawRectangle(px, py, cellW - 2, cellH - 2, c);
                 if (x == h.packetX && y == h.packetY) {
-                    DrawRectangle(px + 5, py + 5, cellW - 12, cellH - 12, C_CYAN);
+                    DrawRectangle(px + 4, py + 4, cellW - 10, cellH - 10, C_CYAN);
                 }
             }
         }
-        Text(u8"[WASD/Стрелки] Движение", 70, H - 100, 14, C_GRAY);
+        
+        // D-pad кнопки
+        int btnSize = Sc(70);
+        int btnPad = Sc(5);
+        int ctrlX = W - Sc(200);
+        int ctrlY = H - Sc(200);
+        
+        // Вверх
+        DrawRectangleRounded({(float)(ctrlX + btnSize + btnPad), (float)ctrlY, (float)btnSize, (float)btnSize}, 0.2f, 8, {40, 60, 80, 255});
+        DrawRectangleRoundedLinesEx({(float)(ctrlX + btnSize + btnPad), (float)ctrlY, (float)btnSize, (float)btnSize}, 0.2f, 8, 2, C_CYAN);
+        Text(u8"↑", ctrlX + btnSize + btnPad + Sc(22), ctrlY + Sc(15), Sc(32), C_WHITE);
+        
+        // Вниз
+        int downY = ctrlY + 2*(btnSize + btnPad);
+        DrawRectangleRounded({(float)(ctrlX + btnSize + btnPad), (float)downY, (float)btnSize, (float)btnSize}, 0.2f, 8, {40, 60, 80, 255});
+        DrawRectangleRoundedLinesEx({(float)(ctrlX + btnSize + btnPad), (float)downY, (float)btnSize, (float)btnSize}, 0.2f, 8, 2, C_CYAN);
+        Text(u8"↓", ctrlX + btnSize + btnPad + Sc(22), downY + Sc(15), Sc(32), C_WHITE);
+        
+        // Влево
+        int midY = ctrlY + btnSize + btnPad;
+        DrawRectangleRounded({(float)ctrlX, (float)midY, (float)btnSize, (float)btnSize}, 0.2f, 8, {40, 60, 80, 255});
+        DrawRectangleRoundedLinesEx({(float)ctrlX, (float)midY, (float)btnSize, (float)btnSize}, 0.2f, 8, 2, C_CYAN);
+        Text(u8"←", ctrlX + Sc(22), midY + Sc(15), Sc(32), C_WHITE);
+        
+        // Вправо
+        int rightX = ctrlX + 2*(btnSize + btnPad);
+        DrawRectangleRounded({(float)rightX, (float)midY, (float)btnSize, (float)btnSize}, 0.2f, 8, {40, 60, 80, 255});
+        DrawRectangleRoundedLinesEx({(float)rightX, (float)midY, (float)btnSize, (float)btnSize}, 0.2f, 8, 2, C_CYAN);
+        Text(u8"→", rightX + Sc(22), midY + Sc(15), Sc(32), C_WHITE);
         break;
     }
     case HackType::Decrypt: {
-        Text(u8"Найди сдвиг для каждой буквы (0-9)", 70, 140, 14, C_GRAY);
+        Text(u8"Введи сдвиг для буквы", Sc(70), Sc(140), Sc(18), C_GRAY);
         
-        int cx = W/2 - (int)h.encrypted.size() * 30;
+        int letterSize = Sc(50);
+        int letterPad = Sc(8);
+        int cx = W/2 - (int)h.encrypted.size() * (letterSize + letterPad) / 2;
+        
         // Зашифрованное
-        Text(u8"Шифр:", cx - 80, 200, 18, C_GRAY);
+        Text(u8"Шифр:", Sc(70), Sc(180), Sc(18), C_GRAY);
         for (int i = 0; i < (int)h.encrypted.size(); i++) {
             char c[2] = {h.encrypted[i], 0};
             Color col = i < h.patternPos ? C_GREEN : i == h.patternPos ? C_CYAN : C_GRAY;
-            DrawRectangle(cx + i * 60, 195, 50, 50, {30, 40, 60, 255});
-            DrawRectangleLinesEx({(float)(cx + i * 60), 195, 50, 50}, 2, col);
-            Text(c, cx + i * 60 + 15, 205, 28, col);
+            int lx = cx + i * (letterSize + letterPad);
+            DrawRectangleRounded({(float)lx, (float)Sc(175), (float)letterSize, (float)letterSize}, 0.15f, 8, {30, 40, 60, 255});
+            DrawRectangleRoundedLinesEx({(float)lx, (float)Sc(175), (float)letterSize, (float)letterSize}, 0.15f, 8, 2, col);
+            Text(c, lx + letterSize/2 - Sc(10), Sc(185), Sc(28), col);
         }
         
         // Расшифрованное
-        Text(u8"Текст:", cx - 80, 280, 18, C_GRAY);
+        Text(u8"Текст:", Sc(70), Sc(255), Sc(18), C_GRAY);
         for (int i = 0; i < (int)h.decrypted.size(); i++) {
             char c[2] = {i < h.patternPos ? h.decrypted[i] : '?', 0};
             Color col = i < h.patternPos ? C_GREEN : C_GRAY;
-            DrawRectangle(cx + i * 60, 275, 50, 50, {30, 40, 60, 255});
-            Text(c, cx + i * 60 + 15, 285, 28, col);
+            int lx = cx + i * (letterSize + letterPad);
+            DrawRectangleRounded({(float)lx, (float)Sc(250), (float)letterSize, (float)letterSize}, 0.15f, 8, {30, 40, 60, 255});
+            Text(c, lx + letterSize/2 - Sc(10), Sc(260), Sc(28), col);
         }
         
-        // Подсказка
-        if (h.patternPos < (int)h.encrypted.size()) {
-            Text(u8"Текущая буква:", 70, 380, 16, C_GRAY);
-            char cur[2] = {h.encrypted[h.patternPos], 0};
-            Text(cur, 200, 375, 24, C_CYAN);
-            Text(u8"Введи сдвиг (0-9):", 70, 420, 16, C_YELLOW);
+        // Экранные кнопки 0-9
+        int keyW = Sc(55), keyH = Sc(50), keyPad = Sc(6);
+        int keysStartX = W/2 - (5 * keyW + 4 * keyPad) / 2;
+        int keysStartY = H - Sc(140);
+        
+        for (int i = 0; i < 10; i++) {
+            int row = i / 5, col = i % 5;
+            int kx = keysStartX + col * (keyW + keyPad);
+            int ky = keysStartY + row * (keyH + keyPad);
+            DrawRectangleRounded({(float)kx, (float)ky, (float)keyW, (float)keyH}, 0.2f, 8, {40, 60, 80, 255});
+            DrawRectangleRoundedLinesEx({(float)kx, (float)ky, (float)keyW, (float)keyH}, 0.2f, 8, 2, C_CYAN);
+            char digit[2] = {(char)('0' + i), 0};
+            Text(digit, kx + keyW/2 - Sc(8), ky + Sc(10), Sc(26), C_WHITE);
         }
         break;
     }
     case HackType::Firewall: {
-        Text(u8"Пролети через щели в файрволе!", 70, 140, 14, C_GRAY);
+        Text(u8"Касайся экрана чтобы двигаться!", Sc(70), Sc(140), Sc(18), C_GRAY);
         
         // Игровое поле
-        DrawRectangle(80, 160, W - 160, H - 260, {10, 15, 25, 255});
+        int fieldX = Sc(60), fieldY = Sc(160);
+        int fieldW = W - Sc(120), fieldH = H - Sc(220);
+        DrawRectangle(fieldX, fieldY, fieldW, fieldH, {10, 15, 25, 255});
+        DrawRectangleLinesEx({(float)fieldX, (float)fieldY, (float)fieldW, (float)fieldH}, 2, C_CYAN);
         
         // Барьеры
         for (int i = 0; i < (int)h.barriers.size(); i++) {
             float b = h.barriers[i];
-            if (b > 80 && b < W - 80) {
-                float gapY = 100 + (i * 73) % (H - 200);
-                float gapH = 120 - h.difficulty * 15;
+            if (b > fieldX && b < fieldX + fieldW - 20) {
+                float gapY = fieldY + 50 + (i * 73) % (fieldH - 150);
+                float gapH = 100 - h.difficulty * 12;
                 // Верхняя часть
-                DrawRectangle((int)b, 160, 20, (int)(gapY - 160), C_RED);
+                DrawRectangle((int)b, fieldY, Sc(20), (int)(gapY - fieldY), C_RED);
                 // Нижняя часть
-                DrawRectangle((int)b, (int)(gapY + gapH), 20, H - 260 - (int)(gapY + gapH - 160), C_RED);
+                DrawRectangle((int)b, (int)(gapY + gapH), Sc(20), fieldY + fieldH - (int)(gapY + gapH), C_RED);
             }
         }
         
-        // Игрок
-        DrawCircle(120, (int)h.playerY, 15, C_CYAN);
-        DrawCircle(120, (int)h.playerY, 10, C_WHITE);
+        // Игрок - большой для видимости
+        int playerX = fieldX + Sc(60);
+        DrawCircle(playerX, (int)h.playerY, Sc(20), C_CYAN);
+        DrawCircle(playerX, (int)h.playerY, Sc(14), C_WHITE);
         
         snprintf(buf, 64, u8"Пройдено: %d/%d", h.passed, h.required);
-        Text(buf, W/2 - 60, H - 90, 18, C_GREEN);
-        Text(u8"[W/S или Стрелки] Движение", 70, H - 90, 14, C_GRAY);
+        Text(buf, W/2 - Sc(80), H - Sc(60), Sc(22), C_GREEN);
         break;
     }
     }
