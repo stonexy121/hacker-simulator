@@ -16,7 +16,18 @@ int gHackType = 0;
 std::map<std::string, bool> gFlags;
 std::deque<std::pair<std::string, Color>> gLog;
 
+// Сенсорное управление
+bool gTouchMode = false;
+Vector2 gTouchPos = {0, 0};
+bool gTouchPressed = false, gTouchReleased = false;
+
 HackGame gHack;
+
+// Проверка касания области
+bool TouchInRect(int x, int y, int w, int h) {
+    return gTouchPressed && gTouchPos.x >= x && gTouchPos.x <= x + w &&
+           gTouchPos.y >= y && gTouchPos.y <= y + h;
+}
 
 void AddLog(const std::string& t, Color c) {
     gLog.push_front({t, c});
@@ -39,7 +50,8 @@ void DrawIntro() {
     
     if (gScrTime > 2) {
         float b = 0.5f + 0.5f * sinf(gTime * 3);
-        DrawText2(u8"[ НАЖМИ ENTER ]", W/2 - 80, H - 100, 18, {200, 200, 200, (unsigned char)(b*255)});
+        const char* hint = gTouchMode ? u8"[ КОСНИСЬ ЭКРАНА ]" : u8"[ НАЖМИ ENTER ]";
+        DrawText2(hint, W/2 - MeasureText2(hint, 18)/2, H - 100, 18, {200, 200, 200, (unsigned char)(b*255)});
     }
     
     DrawText2(u8"© 2024 NeyroSet Games", W/2 - 90, H - 40, 14, {80, 80, 80, 255});
@@ -215,19 +227,45 @@ void UpdateGame(float dt) {
     gScrTime += dt;
     gTypeTimer += dt;
     
+    // Обновление сенсорного ввода
+    #ifdef PLATFORM_ANDROID
+    gTouchMode = true;
+    #else
+    gTouchMode = GetTouchPointCount() > 0;
+    #endif
+    
+    gTouchPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || (GetTouchPointCount() > 0 && IsGestureDetected(GESTURE_TAP));
+    gTouchReleased = IsMouseButtonReleased(MOUSE_LEFT_BUTTON);
+    gTouchPos = GetTouchPointCount() > 0 ? GetTouchPosition(0) : GetMousePosition();
+    
+    // Универсальный ввод: Enter или касание
+    bool inputConfirm = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || gTouchPressed;
+    
     switch (gScr) {
     case Scr::Intro:
-        if (gScrTime > 1.5f && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))) {
+        if (gScrTime > 1.5f && inputConfirm) {
             gScr = Scr::Menu; gScrTime = 0; TriggerGlitch(0.5f);
-            SpawnParticles({W/2.f, H/2.f}, C_CYAN, 30);
+            SpawnParticles({(float)W/2.f, (float)H/2.f}, C_CYAN, 30);
         }
         break;
         
-    case Scr::Menu:
-        if (IsKeyPressed(KEY_UP)) { gMenuSel = (gMenuSel - 1 + 4) % 4; SpawnParticles({W/2.f, 220.f + gMenuSel * 65}, C_CYAN, 5); }
-        if (IsKeyPressed(KEY_DOWN)) { gMenuSel = (gMenuSel + 1) % 4; SpawnParticles({W/2.f, 220.f + gMenuSel * 65}, C_CYAN, 5); }
-        if (IsKeyPressed(KEY_ENTER)) {
-            SpawnParticles({W/2.f, 220.f + gMenuSel * 65}, C_CYAN, 25);
+    case Scr::Menu: {
+        // Сенсорное управление меню
+        if (gTouchMode && gTouchPressed) {
+            for (int i = 0; i < 4; i++) {
+                int y = 220 + i * 65;
+                if (TouchInRect(W/2 - 160, y - 12, 320, 55)) {
+                    gMenuSel = i;
+                    inputConfirm = true;
+                    break;
+                }
+            }
+        }
+        
+        if (IsKeyPressed(KEY_UP)) { gMenuSel = (gMenuSel - 1 + 4) % 4; SpawnParticles({(float)W/2.f, 220.f + gMenuSel * 65}, C_CYAN, 5); }
+        if (IsKeyPressed(KEY_DOWN)) { gMenuSel = (gMenuSel + 1) % 4; SpawnParticles({(float)W/2.f, 220.f + gMenuSel * 65}, C_CYAN, 5); }
+        if (IsKeyPressed(KEY_ENTER) || (gTouchMode && gTouchPressed && TouchInRect(W/2 - 160, 220 + gMenuSel * 65 - 12, 320, 55))) {
+            SpawnParticles({(float)W/2.f, 220.f + gMenuSel * 65}, C_CYAN, 25);
             TriggerGlitch(0.3f);
             if (gMenuSel == 0) {
                 gScr = Scr::Game; gScene = 0; gLine = 0; gDispText.clear();
@@ -240,6 +278,7 @@ void UpdateGame(float dt) {
             } else if (gMenuSel == 3) CloseWindow();
         }
         break;
+    }
         
     case Scr::Game: {
         Scene& sc = gScenes[gScene];
@@ -248,18 +287,37 @@ void UpdateGame(float dt) {
                 gTypeIdx++; gTypeTimer = 0;
                 if (rand() % 8 == 0) SpawnParticles({60.f + gTypeIdx * 8.f, 150}, C_CYAN, 1);
             }
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+            // Касание или Enter для продолжения диалога
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || gTouchPressed) {
                 if (gTypeIdx < (int)gDispText.size()) gTypeIdx = gDispText.size();
-                else { gLine++; gDispText.clear(); gTypeIdx = 0; SpawnParticles({W/2.f, H/2.f}, C_CYAN, 8); }
+                else { gLine++; gDispText.clear(); gTypeIdx = 0; SpawnParticles({(float)W/2.f, (float)H/2.f}, C_CYAN, 8); }
             }
         } else {
             int n = (int)sc.ch.size();
             if (n == 0) return;
+            
+            // Сенсорный выбор вариантов
+            if (gTouchMode && gTouchPressed) {
+                for (int i = 0; i < n; i++) {
+                    int y = 120 + i * 55;
+                    if (TouchInRect(50, y, W - 100, 50)) {
+                        gMenuSel = i;
+                    }
+                }
+            }
+            
             if (IsKeyPressed(KEY_UP)) { gMenuSel = (gMenuSel - 1 + n) % n; SpawnParticles({100, 145.f + gMenuSel * 55}, C_CYAN, 3); }
             if (IsKeyPressed(KEY_DOWN)) { gMenuSel = (gMenuSel + 1) % n; SpawnParticles({100, 145.f + gMenuSel * 55}, C_CYAN, 3); }
             for (int i = 0; i < std::min(n, 9); i++) if (IsKeyPressed(KEY_ONE + i)) gMenuSel = i;
             
-            if (IsKeyPressed(KEY_ENTER)) {
+            // Подтверждение выбора
+            bool choiceConfirm = IsKeyPressed(KEY_ENTER);
+            if (gTouchMode && gTouchPressed) {
+                int y = 120 + gMenuSel * 55;
+                if (TouchInRect(50, y, W - 100, 50)) choiceConfirm = true;
+            }
+            
+            if (choiceConfirm) {
                 DChoice& c = sc.ch[gMenuSel];
                 gKarma += c.karma;
                 gCredits += sc.creditsReward;

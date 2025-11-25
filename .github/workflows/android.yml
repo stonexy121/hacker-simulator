@@ -44,6 +44,11 @@ jobs:
         sed -i '1s/^/#include "raymob.h"\n/' android-build/app/src/main/cpp/main.cpp
         sed -i 's/InitWindow(W, H,/InitWindow(0, 0,/' android-build/app/src/main/cpp/main.cpp
         sed -i 's|resources/JetBrainsMono.ttf|JetBrainsMono.ttf|' android-build/app/src/main/cpp/main.cpp
+        
+        # Set landscape orientation
+        sed -i 's/android:screenOrientation="[^"]*"/android:screenOrientation="sensorLandscape"/' android-build/app/src/main/AndroidManifest.xml
+        # If not found, add it
+        sed -i 's/<activity/<activity android:screenOrientation="sensorLandscape"/' android-build/app/src/main/AndroidManifest.xml
     
     - name: Fix CMake path and C++ standard
       run: |

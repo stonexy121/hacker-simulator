@@ -5,7 +5,18 @@
 #include <deque>
 #include <map>
 
-constexpr int W = 1280, H = 720;
+// Размеры экрана (динамические для Android)
+#ifdef PLATFORM_ANDROID
+    #define W GetScreenWidth()
+    #define H GetScreenHeight()
+#else
+    constexpr int W = 1280, H = 720;
+#endif
+
+// Сенсорное управление
+extern bool gTouchMode;
+extern Vector2 gTouchPos;
+extern bool gTouchPressed, gTouchReleased;
 
 // Цвета
 inline const Color C_BG = {5,8,15,255};
