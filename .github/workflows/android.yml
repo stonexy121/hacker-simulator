@@ -23,8 +23,12 @@ jobs:
     
     - name: Install CMake and NDK
       run: |
-        yes | sdkmanager --install "cmake;3.22.1" "ndk;26.1.10909125"
-        echo "CMAKE_DIR=$ANDROID_SDK_ROOT/cmake/3.22.1/bin" >> $GITHUB_ENV
+        yes | sdkmanager --install "ndk;26.1.10909125"
+        # Install CMake 3.30.3 manually since SDK doesn't have it
+        wget -q https://github.com/Kitware/CMake/releases/download/v3.30.3/cmake-3.30.3-linux-x86_64.tar.gz
+        tar -xzf cmake-3.30.3-linux-x86_64.tar.gz
+        sudo mv cmake-3.30.3-linux-x86_64 /opt/cmake-3.30.3
+        echo "/opt/cmake-3.30.3/bin" >> $GITHUB_PATH
     
     - name: Clone Raymob template
       run: |
@@ -41,27 +45,15 @@ jobs:
         sed -i 's/InitWindow(W, H,/InitWindow(0, 0,/' android-build/app/src/main/cpp/main.cpp
         sed -i 's|resources/JetBrainsMono.ttf|JetBrainsMono.ttf|' android-build/app/src/main/cpp/main.cpp
     
-    - name: Fix CMake version
+    - name: Fix CMake path
       run: |
-        # Add cmake to PATH
-        export PATH=$ANDROID_SDK_ROOT/cmake/3.22.1/bin:$PATH
         cmake --version
-        
-        # Update local.properties with cmake path
-        echo "cmake.dir=$ANDROID_SDK_ROOT/cmake/3.22.1" >> android-build/local.properties
-        
-        # Patch build.gradle to use specific CMake version
-        sed -i '/externalNativeBuild {/,/}/s/cmake {/cmake {\n                version "3.22.1"/' android-build/app/build.gradle
-        
-        # Also try setting in gradle.properties
-        echo "android.native.buildOutput=verbose" >> android-build/gradle.properties
+        echo "cmake.dir=/opt/cmake-3.30.3" >> android-build/local.properties
     
     - name: Build APK
       working-directory: android-build
-      shell: bash
       run: |
-        export PATH="/usr/local/lib/android/sdk/cmake/3.22.1/bin:/usr/bin:$PATH"
-        /usr/bin/chmod +x gradlew
+        chmod +x gradlew
         ./gradlew assembleRelease
     
     - name: Upload APK
